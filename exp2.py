@@ -15,7 +15,7 @@ class CurveDrawer:
         self.control_frame = tk.Frame(root)
         self.control_frame.pack(side=tk.TOP)
         
-        tk.Button(self.control_frame, text="B样条", command=lambda: self.set_mode("bspline")).pack(side=tk.LEFT)
+        tk.Button(self.control_frame, text="B Spline", command=lambda: self.set_mode("bspline")).pack(side=tk.LEFT)
         tk.Button(self.control_frame, text="Bezier (Bernstein)", command=lambda: self.set_mode("bezier")).pack(side=tk.LEFT)
         tk.Button(self.control_frame, text="Bezier (Casteljau)", command=lambda: self.set_mode("casteljau")).pack(side=tk.LEFT)  # 新按钮
         tk.Button(self.control_frame, text="Clear",command=self.clear_canvas).pack(side=tk.LEFT)
@@ -46,49 +46,34 @@ class CurveDrawer:
                 x2, y2 = self.control_points[i+1]
                 self.canvas.create_line(x1, y1, x2, y2, dash=(2,2))
                 
-    def uniform_bspline(self):
-        if len(self.control_points) < 3:
-            return
-            
-        def N(t, i):
-            if t[i] <= t_param < t[i+1]:
-                return 1
-            return 0
-            
-        def N2(t, i):
-            d1 = t[i+2] - t[i]
-            d2 = t[i+1] - t[i]
-            
-            n1 = 0 if d2 == 0 else ((t_param - t[i]) / d2) * N1(t, i)
-            n2 = 0 if d1 == 0 else ((t[i+2] - t_param) / (t[i+2] - t[i+1])) * N1(t, i+1)
-            
-            return n1 + n2
-            
-        def N1(t, i):
-            d1 = t[i+1] - t[i]
-            d2 = t[i+2] - t[i+1]
-            
-            n1 = 0 if d1 == 0 else ((t_param - t[i]) / d1) * N(t, i)
-            n2 = 0 if d2 == 0 else ((t[i+2] - t_param) / d2) * N(t, i+1)
-            
-            return n1 + n2
-            
-        n = len(self.control_points)
-        knots = list(range(n+3))
-        points = []
-        
-        for t_param in np.arange(2, n+1, 0.01):
-            x = y = 0
-            for i in range(n):
-                basis = N2(knots, i)
-                x += basis * self.control_points[i][0]
-                y += basis * self.control_points[i][1]
-            points.append((x, y))
-            
-        for i in range(len(points)-1):
-            self.canvas.create_line(points[i][0], points[i][1], 
-                                  points[i+1][0], points[i+1][1],
-                                  fill='blue', width=2)
+    def draw_bspline(self):
+        points = np.array(self.control_points)
+        n = len(points) - 1
+    
+    # 生成均匀二次B样条的节点
+        t = np.linspace(0, 1, 100)
+    
+    # 绘制曲线
+        curve_points = []
+        for i in range(n-1):
+         if i + 2 <= n:
+            # 计算二次B样条基函数
+            for tj in t:
+                x = (1-tj)**2/2 * points[i][0] + \
+                    (1/2 + tj - tj**2) * points[i+1][0] + \
+                    tj**2/2 * points[i+2][0]
+                
+                y = (1-tj)**2/2 * points[i][1] + \
+                    (1/2 + tj - tj**2) * points[i+1][1] + \
+                    tj**2/2 * points[i+2][1]
+                
+                curve_points.append((x, y))
+    
+    # 绘制曲线段
+        for i in range(len(curve_points)-1):
+         self.canvas.create_line(curve_points[i][0], curve_points[i][1],
+                              curve_points[i+1][0], curve_points[i+1][1],
+                              fill="blue", width=2)
                 
     def bezier_curve(self):
         if len(self.control_points) < 2:
@@ -160,7 +145,7 @@ class CurveDrawer:
         
     def on_double_click(self, event):
         if self.mode == "bspline":
-            self.uniform_bspline()
+            self.draw_bspline()
         elif self.mode == "bezier":
             self.bezier_curve()
         elif self.mode == "casteljau":
